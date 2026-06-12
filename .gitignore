@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Env & Secrets
+.env
+google_creds.json
+token_store.json
+bot_state.json
+
+# Logs
+*.log
+
+# Mac
+.DS_Store
