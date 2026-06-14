@@ -17,6 +17,7 @@ import asyncio
 import config
 from sheets import SheetsClient
 from crm import CRMClient
+import gamification
 
 # Global references that will be set on startup
 sheets_client = None
@@ -275,21 +276,24 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if team_client and croco_id:
                 team_client.mark_lateness(croco_id, today_str)
                 
-            # Break streak immediately
-            curr_streak = int(emp.get("Дней подряд", 0) or 0)
-            if curr_streak > 0:
-                sheets_client.update_employee_field(emp_name, "Дней подряд", 0)
-                sheets_client.update_employee_field(emp_name, "Текущая ачивка", "")
+            # Streak evaluation
+            new_streak, achievement_msg = gamification.process_morning_streak(sheets_client, emp_name, emp, is_late=True)
+            if new_streak == 0 and int(emp.get("Дней подряд", 0) or 0) > 0:
+                curr_streak = int(emp.get("Дней подряд", 0) or 0)
                 msg += f"\n\n💔 Стрик без опозданий ({curr_streak} дн.) сброшен."
         else:
+            new_streak, achievement_msg = gamification.process_morning_streak(sheets_client, emp_name, emp, is_late=False)
             msg = (
                 f"🟢 **[Вовремя]**\n"
                 f"Сотрудник **{emp_name}** отметился вовремя!\n"
                 f"🕒 Время старта: **{time_str}**\n"
+                f"🔥 Текущий стрик: **{new_streak} дн.**\n"
                 f"📍 Геопозиция: [Google Maps]({map_link})"
             )
         try:
             await context.bot.send_message(chat_id=group_chat_id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
+            if not is_late and achievement_msg:
+                await context.bot.send_message(chat_id=group_chat_id, text=achievement_msg, parse_mode="Markdown")
         except Exception as e:
             print(f"[Bot] Failed to send group check-in notification: {e}")
     else:

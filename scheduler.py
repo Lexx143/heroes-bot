@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 import config
 from sheets import SheetsClient
+import gamification
 
 # Global client references set at startup
 sheets_client = None
@@ -138,21 +139,23 @@ async def poll_crocotime_work_start(application, today_str):
                         f"Сотрудник **{emp_name}** приступил к работе (CrocoTime).\n"
                         f"🕒 Время старта: **{time_str}** (ожидалось: {expected_start_str[:-3]})"
                     )
-                    
-                    # Break streak immediately
-                    curr_streak = int(emp.get("Дней подряд", 0) or 0)
-                    if curr_streak > 0:
-                        sheets_client.update_employee_field(emp_name, "Дней подряд", 0)
-                        sheets_client.update_employee_field(emp_name, "Текущая ачивка", "")
+                    # Streak evaluation
+                    new_streak, achievement_msg = gamification.process_morning_streak(sheets_client, emp_name, emp, is_late=True)
+                    if new_streak == 0 and int(emp.get("Дней подряд", 0) or 0) > 0:
+                        curr_streak = int(emp.get("Дней подряд", 0) or 0)
                         msg += f"\n\n💔 Стрик без опозданий ({curr_streak} дн.) сброшен."
                 else:
+                    new_streak, achievement_msg = gamification.process_morning_streak(sheets_client, emp_name, emp, is_late=False)
                     msg = (
                         f"🟢 **[Вовремя]**\n"
                         f"Сотрудник **{emp_name}** приступил к работе (CrocoTime).\n"
-                        f"🕒 Время старта: **{time_str}**"
+                        f"🕒 Время старта: **{time_str}**\n"
+                        f"🔥 Текущий стрик: **{new_streak} дн.**"
                     )
                 try:
                     await application.bot.send_message(chat_id=group_chat_id, text=msg)
+                    if not is_late and achievement_msg:
+                        await application.bot.send_message(chat_id=group_chat_id, text=achievement_msg, parse_mode="Markdown")
                 except Exception as e:
                     print(f"[Scheduler] Failed to send CrocoTime announcement: {e}")
 
@@ -329,60 +332,18 @@ async def check_daily_streaks(application, today_str):
             if team_client.get_user_status_for_date(croco_id, today_str):
                 status = "Уважительная"
         
-        # Streak rules:
-        # "Вовремя" -> increment streak
-        # "Отпуск" / "Больничный" / "Уважительная" -> freeze streak (no change)
-        # "Опоздал" or absent -> reset streak to 0
-        if status == "Вовремя":
-            new_streak = curr_streak + 1
-            streak_action = "increment"
-        elif status in ["Отпуск", "Больничный", "Уважительная"]:
-            new_streak = curr_streak
-            streak_action = "freeze"
+        # Streak rules (Evening):
+        # Morning logic already handles "Вовремя" (increments) and "Опоздал" (resets).
+        # Here we only handle "Absent" (None) or "Уважительная"/"Отпуск"/"Больничный".
+        if status in ["Отпуск", "Больничный", "Уважительная"]:
             print(f"[Scheduler] Streak frozen for {emp_name} (Status: {status})")
+        elif status == "Вовремя" or status == "Опоздал":
+            pass # Already handled in the morning
         else:
-            # "Опоздал" or absent (None)
-            new_streak = 0
-            streak_action = "reset"
-            
-        # Update streak in Google Sheet
-        sheets_client.update_employee_field(emp_name, "Дней подряд", new_streak)
-        
-        # Check gamification milestones
-        # Week = 5 working days -> "Красавчик"
-        # Month = 20 working days -> "Супер Красавчик"
-        # 3 Months = 60 working days -> "Турбо Красавчик"
-        new_ach = curr_ach
-        announcement_msg = None
-        
-        if streak_action == "increment":
-            if new_streak == 5:
-                new_ach = "Красавчик"
-                announcement_msg = f"🏆 **[Ачивка]** **{emp_name}** целую рабочую неделю не опаздывал!\nТы — **Красавчик**! 😎 🥇"
-            elif new_streak == 20:
-                new_ach = "Супер Красавчик"
-                announcement_msg = f"👑 **[Ачивка]** **{emp_name}** целый месяц без опозданий!\nТы — **Супер Красавчик**! 🌟 💎"
-            elif new_streak == 60:
-                new_ach = "Турбо Красавчик"
-                announcement_msg = f"⚡ **[Ачивка]** **{emp_name}** три месяца без единого опоздания!\nТы — **Турбо Красавчик**! 🚀 🔥"
-            elif new_streak == 120:
-                new_ach = "Супер Турбо Красавчик"
-                announcement_msg = f"☄️ **[Ачивка]** **{emp_name}** полгода без единого опоздания!\nТы — **Супер Турбо Красавчик**! 🤯 🦾 🏆"
-            elif new_streak == 240:
-                new_ach = "Мега Красавчик"
-                announcement_msg = f"🌟 **[ЛЕГЕНДА]** **{emp_name}** ЦЕЛЫЙ ГОД без единого опоздания!\nТы — **Мега Красавчик**! 👑 💯 🎊 🍾"
-                
-            if new_ach != curr_ach:
-                sheets_client.update_employee_field(emp_name, "Текущая ачивка", new_ach)
-                
-            if announcement_msg and group_chat_id:
-                try:
-                    await application.bot.send_message(chat_id=group_chat_id, text=announcement_msg, parse_mode="Markdown")
-                except Exception as e:
-                    print(f"[Scheduler] Failed to send milestone announcement: {e}")
-        elif streak_action == "reset" and curr_streak > 0:
-            # Announce streak broken only if they had a streak before
-            sheets_client.update_employee_field(emp_name, "Текущая ачивка", "")
+            # Absent (None) -> reset streak
+            sheets_client.update_employee_field(emp_name, "Дней подряд", 0)
+            if curr_streak > 0:
+                sheets_client.update_employee_field(emp_name, "Текущая ачивка", "")
             if group_chat_id:
                 msg = f"💔 **{emp_name}** опоздал или отсутствовал. Стрик без опозданий ({curr_streak} дн.) сброшен."
                 try:
