@@ -1,6 +1,7 @@
 import os
 import gspread
 from google.oauth2.service_account import Credentials
+from datetime import datetime
 
 class SheetsClient:
     def __init__(self, creds_file, sheet_title, share_email):
@@ -231,3 +232,36 @@ class SheetsClient:
             print(f"[Sheets] Removed employee row {row_idx}.")
             return True
         return False
+
+    @staticmethod
+    def get_employee_start_time(emp, now_dt):
+        """
+        Determine the start time for the employee based on the day of the week.
+        Supports overrides like 'ПН Время начала', 'ВТ Время начала', etc.
+        """
+        weekday_cols = {
+            0: "ПН Время начала",
+            1: "ВТ Время начала",
+            2: "СР Время начала",
+            3: "ЧТ Время начала",
+            4: "ПТ Время начала"
+        }
+        
+        day_col = weekday_cols.get(now_dt.weekday())
+        start_time_str = None
+        
+        # Check specific weekday column
+        if day_col and emp.get(day_col):
+            val = str(emp.get(day_col)).strip()
+            if val:
+                start_time_str = val
+                
+        # Fallback to general start time
+        if not start_time_str:
+            start_time_str = str(emp.get("Время начала", "09:00:00")).strip()
+            
+        # Ensure it has seconds
+        if len(start_time_str.split(":")) == 2:
+            start_time_str += ":00"
+            
+        return start_time_str

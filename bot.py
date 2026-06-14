@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -21,6 +21,7 @@ from crm import CRMClient
 # Global references that will be set on startup
 sheets_client = None
 crm_client = None
+team_client = None
 
 # Track user state
 # pending_location_requests: dict of user_id -> datetime (when requested)
@@ -62,13 +63,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
     else:
-        await update.message.reply_text(
-            f"⚠️ Я не нашел имя пользователя `@{username}` в Google Таблице.\n\n"
-            "Пожалуйста, попросите администратора добавить ваш Username в колонку 'Telegram Username'.\n"
-            "Или вы можете ввести команду для ручной привязки:\n"
-            "`/register Ваше Имя Фамилия` (точно как в таблице)",
-            parse_mode="Markdown"
-        )
+        # If not found automatically, offer inline keyboard
+        employees = sheets_client.get_employees()
+        unlinked = [e.get("ФИО") for e in employees if not str(e.get("Telegram User ID", "")).strip()]
+        
+        if unlinked:
+            keyboard = []
+            for name in unlinked:
+                keyboard.append([InlineKeyboardButton(name, callback_data=f"reg_{name}")])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                f"⚠️ Я не смог найти профиль `@{username}` автоматически.\n\n"
+                "Пожалуйста, выбери свое имя из списка сотрудников ниже:",
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                f"⚠️ Я не нашел имя пользователя `@{username}` в Google Таблице, и свободных профилей больше нет.\n\n"
+                "Пожалуйста, попросите администратора добавить вас.",
+                parse_mode="Markdown"
+            )
+
+async def handle_register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles inline keyboard registration."""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    if data.startswith("reg_"):
+        emp_name = data[4:]
+        user_id = str(query.from_user.id)
+        
+        sheets_client.update_employee_field(emp_name, "Telegram User ID", user_id)
+        
+        keyboard = [[KeyboardButton("📍 Отправить геопозицию для чекина", request_location=True)]]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+        
+        await query.edit_message_text(f"🎉 Успешно! Твой профиль сопоставлен с сотрудником **{emp_name}**.", parse_mode="Markdown")
+        await query.message.reply_text("Чтобы отметиться о начале рабочего дня, нажми на кнопку ниже или отправь геопозицию.", reply_markup=reply_markup)
 
 async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Manually link employee name to Telegram ID."""
@@ -172,10 +206,11 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #     return
 
     # 3. Calculate punctuality
-    now_time = datetime.now().time()
-    expected_start_str = emp.get("Время начала", "09:00:00")
+    now_dt = datetime.now()
+    now_time = now_dt.time()
+    expected_start_str = sheets_client.get_employee_start_time(emp, now_dt)
     
-    # Standardize time format
+    # Ensure seconds are present
     if len(expected_start_str.split(":")) == 2:
         expected_start_str += ":00"
         
@@ -234,6 +269,18 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🕒 Время старта: **{time_str}** (ожидалось: {expected_start_str[:-3]})\n"
                 f"📍 Геопозиция: [Google Maps]({map_link})"
             )
+            
+            # Post lateness to Team portal
+            croco_id = str(emp.get("Croco ID", "")).strip()
+            if team_client and croco_id:
+                team_client.mark_lateness(croco_id, today_str)
+                
+            # Break streak immediately
+            curr_streak = int(emp.get("Дней подряд", 0) or 0)
+            if curr_streak > 0:
+                sheets_client.update_employee_field(emp_name, "Дней подряд", 0)
+                sheets_client.update_employee_field(emp_name, "Текущая ачивка", "")
+                msg += f"\n\n💔 Стрик без опозданий ({curr_streak} дн.) сброшен."
         else:
             msg = (
                 f"🟢 **[Вовремя]**\n"

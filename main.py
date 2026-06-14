@@ -1,12 +1,20 @@
 import os
 import sys
 import asyncio
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ChatMemberHandler
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ChatMemberHandler,
+    CallbackQueryHandler
+)
 import config
 import bot
 import scheduler
 from sheets import SheetsClient
 from croco import CrocoClient
+from team_client import init_team_client
 from crm import CRMClient
 
 background_tasks = set()
@@ -50,19 +58,28 @@ def main():
         password=config.CROCO_PASSWORD,
         token_file=config.TOKEN_STORE_FILE
     )
+    
+    # Initialize Team Client
+    team_client = init_team_client(
+        config.CROCO_LOGIN,
+        config.CROCO_PASSWORD
+    )
+    team_client.login()
 
     # 3. Initialize Asista CRM Client
     crm_client = CRMClient(
         token_file=config.TOKEN_STORE_FILE
     )
 
-    # 4. Bind clients globally to bot and scheduler modules
+    # 4. Inject dependencies
     bot.sheets_client = sheets_client
     bot.crm_client = crm_client
+    bot.team_client = team_client
     
-    scheduler.sheets_client = sheets_client
-    scheduler.croco_client = croco_client
     scheduler.crm_client = crm_client
+    scheduler.croco_client = croco_client
+    scheduler.team_client = team_client
+    scheduler.sheets_client = sheets_client
 
     # 5. Build Telegram Application
     token = config.TELEGRAM_BOT_TOKEN
@@ -79,8 +96,9 @@ def main():
         .build()
     )
 
-    # 6. Register Telegram command & message handlers
+    # 6. Register Handlers
     application.add_handler(CommandHandler("start", bot.start))
+    application.add_handler(CallbackQueryHandler(bot.handle_register_callback, pattern='^reg_'))
     application.add_handler(CommandHandler("register", bot.register))
     application.add_handler(CommandHandler("setgroup", bot.set_group))
     application.add_handler(CommandHandler("sync", bot.sync_members))
