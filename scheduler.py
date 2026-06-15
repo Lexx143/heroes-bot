@@ -104,7 +104,7 @@ async def poll_crocotime_work_start(application, today_str):
             work_begin_seconds = matched_start["seconds"]
             
             # Check individual expected start time
-            expected_start_str = SheetsClient.get_employee_start_time(emp, now)
+            expected_start_str = SheetsClient.get_employee_start_time(emp, datetime.now())
             if len(expected_start_str.split(":")) == 2:
                 expected_start_str += ":00"
             
