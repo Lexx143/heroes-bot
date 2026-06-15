@@ -359,12 +359,6 @@ async def check_daily_streaks(application, today_str):
             sheets_client.update_employee_field(emp_name, "Дней подряд", 0)
             if curr_streak > 0:
                 sheets_client.update_employee_field(emp_name, "Текущая ачивка", "")
-            if group_chat_id:
-                msg = f"💔 **{emp_name}** опоздал или отсутствовал. Стрик без опозданий ({curr_streak} дн.) сброшен."
-                try:
-                    await application.bot.send_message(chat_id=group_chat_id, text=msg)
-                except Exception as e:
-                    print(f"[Scheduler] Failed to send streak reset notification: {e}")
                     
         print(f"[Scheduler] Daily streak checked for {emp_name} (Status: {status})")
 
