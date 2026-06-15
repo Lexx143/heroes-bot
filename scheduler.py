@@ -136,7 +136,7 @@ async def poll_crocotime_work_start(application, today_str):
                 if is_late:
                     msg = (
                         f"🔴 **[Опоздание]**\n"
-                        f"Сотрудник **{emp_name}** приступил к работе (CrocoTime).\n"
+                        f"**{emp_name}** приступил к работе (CrocoTime).\n"
                         f"🕒 Время старта: **{time_str}** (ожидалось: {expected_start_str[:-3]})"
                     )
                     # Streak evaluation
@@ -148,7 +148,7 @@ async def poll_crocotime_work_start(application, today_str):
                     new_streak, achievement_msg = gamification.process_morning_streak(sheets_client, emp_name, emp, is_late=False)
                     msg = (
                         f"🟢 **[Вовремя]**\n"
-                        f"Сотрудник **{emp_name}** приступил к работе (CrocoTime).\n"
+                        f"**{emp_name}** приступил к работе (CrocoTime).\n"
                         f"🕒 Время старта: **{time_str}**\n"
                         f"🔥 Текущий стрик: **{new_streak} дн.**"
                     )

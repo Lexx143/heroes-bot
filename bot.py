@@ -266,7 +266,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_late:
             msg = (
                 f"🔴 **[Опоздание]**\n"
-                f"Сотрудник **{emp_name}** отметился с опозданием.\n"
+                f"**{emp_name}** отметился с опозданием.\n"
                 f"🕒 Время старта: **{time_str}** (ожидалось: {expected_start_str[:-3]})\n"
                 f"📍 Геопозиция: [Google Maps]({map_link})"
             )
@@ -285,7 +285,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_streak, achievement_msg = gamification.process_morning_streak(sheets_client, emp_name, emp, is_late=False)
             msg = (
                 f"🟢 **[Вовремя]**\n"
-                f"Сотрудник **{emp_name}** отметился вовремя!\n"
+                f"**{emp_name}** отметился вовремя!\n"
                 f"🕒 Время старта: **{time_str}**\n"
                 f"🔥 Текущий стрик: **{new_streak} дн.**\n"
                 f"📍 Геопозиция: [Google Maps]({map_link})"
