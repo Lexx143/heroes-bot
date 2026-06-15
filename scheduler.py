@@ -76,6 +76,11 @@ async def poll_crocotime_work_start(application, today_str):
 
     for emp in employees:
         emp_name = emp.get("ФИО")
+        
+        is_controlled = str(emp.get("Контролировать", "да")).strip().lower() != "нет"
+        if not is_controlled:
+            continue
+            
         croco_id = emp.get("Croco ID") # E.g., "IT116"
         
         if str(emp.get("Есть CrocoTime", "")).strip().lower() != "да" or not croco_id:
@@ -183,6 +188,11 @@ async def check_and_send_morning_requests(application, today_str, now):
     
     for emp in employees:
         emp_name = emp.get("ФИО")
+        
+        is_controlled = str(emp.get("Контролировать", "да")).strip().lower() != "нет"
+        if not is_controlled:
+            continue
+            
         tg_user_id = emp.get("Telegram User ID")
         
         if not tg_user_id:
@@ -318,6 +328,11 @@ async def check_daily_streaks(application, today_str):
 
     for emp in employees:
         emp_name = emp.get("ФИО")
+        
+        is_controlled = str(emp.get("Контролировать", "да")).strip().lower() != "нет"
+        if not is_controlled:
+            continue
+            
         curr_streak = int(emp.get("Дней подряд", 0) or 0)
         curr_ach = emp.get("Текущая ачивка", "")
         
@@ -351,7 +366,7 @@ async def check_daily_streaks(application, today_str):
                 except Exception as e:
                     print(f"[Scheduler] Failed to send streak reset notification: {e}")
                     
-        print(f"[Scheduler] Daily streak calculated for {emp_name}: {curr_streak} -> {new_streak}")
+        print(f"[Scheduler] Daily streak checked for {emp_name} (Status: {status})")
 
 async def broadcast_unstarted_users(application):
     print("[Scheduler] Running Sunday broadcast for unstarted users...")
@@ -365,6 +380,11 @@ async def broadcast_unstarted_users(application):
     
     for emp in employees:
         emp_name = emp.get("ФИО", "Unknown")
+        
+        is_controlled = str(emp.get("Контролировать", "да")).strip().lower() != "нет"
+        if not is_controlled:
+            continue
+            
         tg_user_id = emp.get("Telegram User ID")
         
         if not tg_user_id:

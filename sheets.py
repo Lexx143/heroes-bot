@@ -56,10 +56,10 @@ class SheetsClient:
             self.spreadsheet.worksheet("Сотрудники")
         except gspread.WorksheetNotFound:
             ws_emp = self.spreadsheet.add_worksheet("Сотрудники", rows=100, cols=10)
-            ws_emp.update("A1:J1", [[
+            ws_emp.update("A1:K1", [[
                 "ФИО", "Telegram Username", "Telegram User ID", 
                 "Есть CrocoTime", "Croco ID", "CRM ID", 
-                "Время начала", "Запрашивать план", "Текущая ачивка", "Дней подряд"
+                "Время начала", "Запрашивать план", "Текущая ачивка", "Дней подряд", "Контролировать"
             ]])
 
         # 2. 'Журнал чекинов'
@@ -92,10 +92,10 @@ class SheetsClient:
             ws_emp = self.spreadsheet.add_worksheet("Сотрудники", rows=100, cols=10)
         
         ws_emp.clear()
-        ws_emp.update("A1:J1", [[
+        ws_emp.update("A1:K1", [[
             "ФИО", "Telegram Username", "Telegram User ID", 
             "Есть CrocoTime", "Croco ID", "CRM ID", 
-            "Время начала", "Запрашивать план", "Текущая ачивка", "Дней подряд"
+            "Время начала", "Запрашивать план", "Текущая ачивка", "Дней подряд", "Контролировать"
         ]])
 
         # Setup 'Журнал чекинов'

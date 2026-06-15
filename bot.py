@@ -196,6 +196,11 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     emp_name = emp.get("ФИО")
     
+    is_controlled = str(emp.get("Контролировать", "да")).strip().lower() != "нет"
+    if not is_controlled:
+        await message.reply_text("Ваша посещаемость не контролируется ботом. Хорошего дня! 😊")
+        return
+    
     # 2. Check if already checked in today
     today_str = datetime.now().strftime("%Y-%m-%d")
     checkins = sheets_client.get_checkins_for_date(today_str)
