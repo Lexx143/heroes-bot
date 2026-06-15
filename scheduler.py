@@ -165,8 +165,8 @@ async def poll_crocotime_work_start(application, today_str):
                     print(f"[Scheduler] Failed to send CrocoTime announcement: {e}")
 
 async def check_and_send_morning_requests(application, today_str, now):
-    # Run from 5:00 AM to 23:00 PM
-    if not (5 <= now.hour < 23):
+    # Run from 5:00 AM to 12:00 PM (noon)
+    if not (5 <= now.hour < 12):
         return
         
     state = config.load_state()
