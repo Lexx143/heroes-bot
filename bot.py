@@ -201,10 +201,9 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     checkins = sheets_client.get_checkins_for_date(today_str)
     already_checked = any(c.get("ФИО") == emp_name for c in checkins)
     
-    # [Removed early return for testing multiple checkins]
-    # if already_checked:
-    #     await message.reply_text("Вы уже отмечались сегодня! Хорошего продолжения дня.")
-    #     return
+    if already_checked:
+        await message.reply_text("✅ Вы уже отмечались сегодня! Хорошего продолжения дня. 👍")
+        return
 
     # 3. Calculate punctuality
     now_dt = datetime.now()
