@@ -1,7 +1,28 @@
 import os
+import time
+from functools import wraps
+from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+
+def retry_on_api_error(max_retries=3, delay=2):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if "503" in str(e) or "502" in str(e) or "500" in str(e):
+                        retries += 1
+                        print(f"[Sheets] API Error ({e}). Retrying {retries}/{max_retries} in {delay}s...")
+                        time.sleep(delay)
+                    else:
+                        raise
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 class SheetsClient:
     def __init__(self, creds_file, sheet_title, share_email):
@@ -125,11 +146,13 @@ class SheetsClient:
         except Exception:
             pass
 
+    @retry_on_api_error()
     def get_employees(self):
         """Returns all employee rows as list of dicts."""
         ws = self.spreadsheet.worksheet("Сотрудники")
         return ws.get_all_records()
 
+    @retry_on_api_error()
     def update_employee_field(self, name, field, value):
         """Update a specific field for an employee by their ФИО."""
         ws = self.spreadsheet.worksheet("Сотрудники")
@@ -154,18 +177,21 @@ class SheetsClient:
         ws.update_cell(row_idx, col_idx, value)
         return True
 
-    def log_checkin(self, date_str, name, time_str, checkin_type, status, coordinates="", map_link=""):
-        """Logs a check-in event to the log sheet."""
+    @retry_on_api_error()
+    def log_checkin(self, date_str, name, time_str, checkin_type, status, coordinates, map_link=""):
+        """Logs a check-in to the 'Отметки' sheet."""
         ws = self.spreadsheet.worksheet("Журнал чекинов")
         ws.append_row([date_str, name, time_str, checkin_type, status, coordinates, map_link])
 
+    @retry_on_api_error()
     def log_task_plan(self, date_str, name, plan_text):
-        """Logs a daily plan/status to the plan sheet."""
+        """Logs a daily plan/task status to the 'Планы задач' sheet."""
         ws = self.spreadsheet.worksheet("Планы задач")
         ws.append_row([date_str, name, plan_text])
 
+    @retry_on_api_error()
     def get_checkins_for_date(self, date_str):
-        """Returns check-ins logged for a specific date."""
+        """Returns all check-ins for a specific date from the 'Отметки' sheet."""
         ws = self.spreadsheet.worksheet("Журнал чекинов")
         records = ws.get_all_records()
         return [r for r in records if r.get("Дата") == date_str]
@@ -210,6 +236,7 @@ class SheetsClient:
             print(f"[Sheets] Added new employee '{name}' to sheet.")
             return True  # New
 
+    @retry_on_api_error()
     def remove_employee(self, name=None, username=None, user_id=None):
         """Removes an employee row from the 'Сотрудники' sheet."""
         ws = self.spreadsheet.worksheet("Сотрудники")
