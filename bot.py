@@ -184,6 +184,11 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = str(user.id)
     location = message.location
+    if not location and message.venue:
+        location = message.venue.location
+        
+    if not location:
+        return
     
     # 1. Find employee by TG User ID
     emp = find_employee_by_tg_id(user_id)
@@ -294,6 +299,10 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🔥 Текущий стрик: **{new_streak} дн.**\n"
                 f"📍 Геопозиция: [Google Maps]({map_link})"
             )
+            # Post 8 hours to Team portal
+            croco_id = str(emp.get("Croco ID", "")).strip()
+            if team_client and croco_id:
+                team_client.set_work_hours(croco_id, today_str, worked_time=8)
         try:
             await context.bot.send_message(chat_id=group_chat_id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
             if not is_late and achievement_msg:
@@ -369,7 +378,7 @@ async def process_plan_submission(update, context, emp, text, voice_file_id=None
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
         await update.message.reply_text(
             "📝 Твой план на день сохранен. Спасибо!\n\n"
-            "📍 Теперь, пожалуйста, отправь свою геопозицию для фиксации начала рабочего дня (нажми кнопку ниже).",
+            "📍 Если ты еще не отметил начало рабочего дня, не забудь отправить геопозицию (нажми кнопку ниже).",
             reply_markup=reply_markup
         )
     else:

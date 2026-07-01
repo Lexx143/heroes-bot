@@ -104,7 +104,7 @@ def main():
     application.add_handler(CommandHandler("sync", bot.sync_members))
     
     # Handle geoposition location check-ins
-    application.add_handler(MessageHandler(filters.LOCATION, bot.location_handler))
+    application.add_handler(MessageHandler(filters.LOCATION | filters.VENUE, bot.location_handler))
     
     # Handle text messages in private chats (daily CRM task plans / statuses)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, bot.text_handler))
